@@ -1,0 +1,19 @@
+syntax = "proto2";
+
+package GMKProtoBuf;
+
+message Vertex {
+
+    message Position {
+        required double x = 1;
+        required double y = 2;
+        required double z = 3;
+    }
+
+    required Position position = 1;
+
+}
+
+message Mesh {
+    repeated Vertex vertices = 1;
+}

@@ -8,18 +8,26 @@ public class RuntimeGeometryDemo : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		//#pragma warning supress C4125 - Doesn't Work
+
 		PublicDependencyModuleNames.AddRange(
-			new string[] { 
-				"Core", 
-				"CoreUObject", 
-				"Engine", 
-				"InputCore", 
+			new string[] {
+				"Core",
+				"CoreUObject",
+				"Engine",
+				"InputCore",
 				"HeadMountedDisplay",
 				"ProceduralMeshComponent",
 				"GeometricObjects",
 				"DynamicMesh",
 				"RuntimeGeometryUtils",
-				"ModelingComponents"
+				"ModelingComponents",
+				"Protobuf"
 			});
+
+		// Protobuf Plugin Settings
+		bEnableUndefinedIdentifierWarnings = false;		// Enable warnings for using undefined identifiers in #if expressions
+		bEnableExceptions = true;						// Enable exception handling
+
 	}
 }

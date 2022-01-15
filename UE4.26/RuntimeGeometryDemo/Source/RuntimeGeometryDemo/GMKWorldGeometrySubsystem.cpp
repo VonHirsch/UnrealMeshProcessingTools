@@ -2,10 +2,13 @@
 
 
 #include "GMKWorldGeometrySubsystem.h"
-
-
 #include "DynamicPMCActor.h"
 #include "RuntimeGeometryDemo.h"
+#include <fstream>
+
+#include "Generators/GridBoxMeshGenerator.h"
+#include "ProtoBuf/addressbook.pb.h"
+#include "ProtoBuf/DynamicMesh3_ProtoBuf.pb.h"
 
 UGMKWorldGeometrySubsystem::UGMKWorldGeometrySubsystem()
 {
@@ -38,16 +41,23 @@ void UGMKWorldGeometrySubsystem::InitializeWorldContext(UWorld* World)
 		SpawnInfo.ObjectFlags = RF_Transient;
 		FTransform MyTransform = FTransform(FVector(-290.f, 380.f, 180.f));
 		ADynamicPMCActor* ChunkActor = (GetWorld()->SpawnActor<ADynamicPMCActor>(WorldSystemDataAssets->ChunkActor.Get(), FVector(-290.f, 380.f, 180.f), FRotator(0,0,0), SpawnInfo));
-		ChunkActor->SetActorLabel("GMK ChunkActor");
+		ChunkActor->SetActorLabel("GMKChunkActor");
 		ChunkActor->CollisionMode = EDynamicMeshActorCollisionMode::ComplexAsSimpleAsync;
 
-		ChunkActor->MeshComponent->bUseAsyncCooking = (ChunkActor->CollisionMode == EDynamicMeshActorCollisionMode::ComplexAsSimpleAsync);	// enables collision
+		ChunkActor->MeshComponent->bUseAsyncCooking = (ChunkActor->CollisionMode == EDynamicMeshActorCollisionMode::ComplexAsSimpleAsync);
 		ChunkActor->MeshComponent->bUseComplexAsSimpleCollision = true;
+
+		// Do a null edit just to RegenerateSourceMesh()  Otherwise collisions won't work
+		ChunkActor->EditMesh([this](FDynamicMesh3& MeshToUpdate) {});
 
 	} else
 	{
 		SYSLOG("GMK ChunkActor Null");
 	}
+
+	AddPerson();
+
+	/*
 
 	// This works for spawning a simple ADynamicPMCActor
 
@@ -79,4 +89,226 @@ void UGMKWorldGeometrySubsystem::InitializeWorldContext(UWorld* World)
 	// PDIRenderActor = TargetWorld->SpawnActor<AActor>(FVector::ZeroVector, FRotator(0,0,0), SpawnInfo);
 	// Attach Component to generic actor ... (should I do this instead?)
 
+	*/
+
 }
+
+TSharedPtr<FDynamicMesh3> UGMKWorldGeometrySubsystem::CreateTestBoxMesh()
+{
+	FGridBoxMeshGenerator BoxGenerator;
+	BoxGenerator.Box = FOrientedBox3d(FVector3d::Zero(), FVector3d(1.0, 1.0, 1.0));
+	int EdgeNum = 5;
+	BoxGenerator.EdgeVertices = FIndex3i(EdgeNum, EdgeNum, EdgeNum);
+	BoxGenerator.Generate();
+
+	TSharedPtr<FDynamicMesh3> Mesh = MakeShareable<FDynamicMesh3>(new FDynamicMesh3(&BoxGenerator));
+	return Mesh;
+}
+
+void UGMKWorldGeometrySubsystem::MeshTest()
+{
+	SYSLOG("GMK MeshTest");
+
+	// ---- Setup
+	// Create a box mesh, random noise, and a directional filter pointing in the +Y direction
+	TSharedPtr<FDynamicMesh3> InputMesh = CreateTestBoxMesh();
+	bool meshValid = InputMesh->CheckValidity();
+
+	SerializeMeshTest(InputMesh.Get());
+	DeSerializeMeshTest();
+
+	const FString LogMessage = (FString::Printf(TEXT("GMK MeshTest Result [%d]"), meshValid));
+	SYSLOG(LogMessage);
+
+}
+
+void UGMKWorldGeometrySubsystem::SerializeMeshTest(const FDynamicMesh3* Mesh)
+{
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+	GMKProtoBuf::Mesh ProtoMesh;
+
+	// for each triangle index
+	for (int32 tid : Mesh->TriangleIndicesItr())
+	{
+		FVector3d Position[3];
+		// get vertices
+		Mesh->GetTriVertices(tid, Position[0], Position[1], Position[2]);
+
+		for (int j = 0; j < 3; ++j)
+		{
+			AddVertex(ProtoMesh.add_vertices(), &Position[j]);
+		}
+	}
+
+	const FString LogMessage = (FString::Printf(TEXT("writing [%d] vertices"), ProtoMesh.vertices_size()));
+	SYSLOG(LogMessage);
+
+	const FString OutputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), TEXT("ProtoMesh.buf"));
+	std::fstream output(ToCStr(OutputFileName), std::ios::out | std::ios::trunc | std::ios::binary);
+
+	if (!ProtoMesh.SerializeToOstream(&output)) {
+		SYSLOG("Failed to write ProtoMesh.");
+	} else
+	{
+		output.close();
+	}
+
+}
+
+void UGMKWorldGeometrySubsystem::DeSerializeMeshTest()
+{
+
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+	GMKProtoBuf::Mesh ProtoMesh;
+
+	const FString InputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), TEXT("ProtoMesh.buf"));
+	std::fstream input(ToCStr(InputFileName), std::ios::in | std::ios::binary);
+
+	if (!ProtoMesh.ParseFromIstream(&input)) {
+		SYSLOG("Failed to read ProtoMesh.");
+	} else
+	{
+		input.close();
+	}
+
+	const FString LogMessage = (FString::Printf(TEXT("read [%d] vertices"), ProtoMesh.vertices_size()));
+	SYSLOG(LogMessage);
+
+	for (int i = 0; i < ProtoMesh.vertices_size(); i++)
+	{
+		const GMKProtoBuf::Vertex& ProtoVertex = ProtoMesh.vertices(i);
+		const GMKProtoBuf::Vertex::Position& ProtoPosition = ProtoVertex.position();
+
+		// const FString LogMessage2 = (FString::Printf(TEXT("Vertex Position: [%f],[%f],[%f]"), ProtoPosition.x(), ProtoPosition.y(), ProtoPosition.z()));
+		// SYSLOG(LogMessage2);
+
+	}
+
+}
+
+void UGMKWorldGeometrySubsystem::AddVertex(GMKProtoBuf::Vertex* ProtoVertex, FVector3d* Position)
+{
+	GMKProtoBuf::Vertex_Position* ProtoPosition = ProtoVertex->mutable_position();
+	ProtoPosition->set_x(Position->X);
+	ProtoPosition->set_y(Position->Y);
+	ProtoPosition->set_z(Position->Z);
+}
+
+void UGMKWorldGeometrySubsystem::AddMesh(const FDynamicMesh3* Mesh)
+{
+
+	/*
+	 *
+	// Verify that the version of the library that we linked against is
+	// compatible with the version of the headers we compiled against.
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+	GMKProtoBuf::Mesh ProtoMesh;
+	//ProtoMesh.add_vertices()
+
+
+	// code from UpdatePMCFromDynamicMesh_SplitTriangles
+
+	//int32 NumTriangles = Mesh->TriangleCount();
+	//int32 NumVertices = NumTriangles * 3;
+
+
+
+
+	FVector3d Position[3];
+	FVector3f Normal[3];
+	FVector2f UV[3];
+	int32 BufferIndex = 0;
+
+	for (int32 tid : Mesh->TriangleIndicesItr())
+	{
+		//int32 k = 3 * (BufferIndex++);
+
+		Mesh->GetTriVertices(tid, Position[0], Position[1], Position[2]);
+
+		GMKProtoBuf::Mesh_Vertex_Position* protoPosition;
+
+		protoPosition->set_x(Position[0]);
+
+
+		// Vertices[k] = (FVector)Position[0];
+		// Vertices[k+1] = (FVector)Position[1];
+		// Vertices[k+2] = (FVector)Position[2];
+
+
+		// triangles
+		GMKProtoBuf::Mesh_Triangle_VertexIndexes* vertindex;
+		vertindex->set_vert0()
+
+		GMKProtoBuf::Mesh_Triangle* triangle = ProtoMesh.add_triangles();
+
+		triangle->set_allocated_vertexindexes()
+
+		//GMKProtoBuf::Mesh_Vertex* vertex = ProtoMesh.add_vertices();
+
+		//vertex.set_
+		//person->set_id(999);
+
+
+
+
+	}
+
+*/
+
+}
+void UGMKWorldGeometrySubsystem::AddPerson()
+{
+	// Verify that the version of the library that we linked against is
+	// compatible with the version of the headers we compiled against.
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+	tutorial::AddressBook address_book;
+	tutorial::Person* person = address_book.add_people();
+	person->set_id(999);
+
+	const FString OutputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), TEXT("people.buf"));
+	std::fstream output(ToCStr(OutputFileName), std::ios::out | std::ios::trunc | std::ios::binary);
+
+	if (!address_book.SerializeToOstream(&output)) {
+		SYSLOG("Failed to write address book.");
+	} else
+	{
+		output.close();
+	}
+
+	// Optional:  Delete all global objects allocated by libprotobuf.
+	google::protobuf::ShutdownProtobufLibrary();
+
+}
+
+// Iterates though all people in the AddressBook and prints info about them.
+// using namespace std;
+// void UGMKWorldGeometrySubsystem::ListPeople(const tutorial::AddressBook& address_book) {
+// 	for (int i = 0; i < address_book.people_size(); i++) {
+// 		const tutorial::Person& person = address_book.people(i);
+//
+// 		cout << "Person ID: " << person.id() << endl;
+// 		cout << "  Name: " << person.name() << endl;
+// 		if (person.has_email()) {
+// 			cout << "  E-mail address: " << person.email() << endl;
+// 		}
+//
+// 		for (int j = 0; j < person.phones_size(); j++) {
+// 			const tutorial::Person::PhoneNumber& phone_number = person.phones(j);
+//
+// 			switch (phone_number.type()) {
+// 			case tutorial::Person::MOBILE_PHONE:
+// 				cout << "  Mobile phone #: ";
+// 				break;
+// 			case tutorial::Person::HOME:
+// 				cout << "  Home phone #: ";
+// 				break;
+// 			case tutorial::Person::WORK:
+// 				cout << "  Work phone #: ";
+// 				break;
+// 			}
+// 			cout << phone_number.number() << endl;
+// 		}
+// 	}
+// }

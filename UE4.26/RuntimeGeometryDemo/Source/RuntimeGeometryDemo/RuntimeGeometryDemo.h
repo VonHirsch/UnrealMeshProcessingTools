@@ -6,6 +6,12 @@
 
 #include "Engine/Console.h"
 
+// Disable warnings for ProtoBuf
+//#pragma warning (disable : 4800) // forcing value to bool true or false
+//#pragma warning (disable : 4125) // decimal digit terminates octal escape sequence
+//#pragma warning (disable : 4647) // behavior change __is_pod has different value in previous version
+//#pragma warning (disable : 4668) // 'symbol' is not defined as a preprocessor macro, replacing with '0' for 'directives'
+
 inline FString ENetModeToFString(ENetMode NetMode)
 {
 	if (NetMode == NM_Standalone) return "NM_Standalone";

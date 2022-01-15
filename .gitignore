@@ -1,3 +1,15 @@
+# Project Related Files
+
+# Serialized File Output Directory
+/UE4.26/RuntimeGeometryDemo/Buf
+
+# Protobuf plugin
+/UE4.26/RuntimeGeometryDemo/Plugins/Protobuf
+
+# Generated protobuf files
+/UE4.26/RuntimeGeometryDemo/Source/RuntimeGeometryDemo/ProtoBuf/*.h
+/UE4.26/RuntimeGeometryDemo/Source/RuntimeGeometryDemo/ProtoBuf/*.cc
+
 # Visual Studio 2015 user specific files
 .vs/
 .idea/
