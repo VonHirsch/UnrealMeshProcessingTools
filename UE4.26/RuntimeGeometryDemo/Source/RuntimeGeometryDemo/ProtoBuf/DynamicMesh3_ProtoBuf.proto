@@ -10,10 +10,86 @@ message Vertex {
         required double z = 3;
     }
 
-    required Position position = 1;
+    message VertexNormals {
+        required float x = 1;
+        required float y = 2;
+        required float z = 3;
+    }
+
+    message VertexColors {
+        required float r = 1;
+        required float g = 2;
+        required float b = 3;
+    }
+
+    message UVs {
+        required float u = 1;
+        required float v = 2;
+    }
+
+    optional Position position = 1;
+    optional VertexNormals normals = 2;
+    optional VertexColors colors = 3;
+    optional UVs uvs = 4;
+
+    /** Reference counts of vertex indices. For vertices that exist, the count is 1 + num_triangle_using_vertex. Iterate over this to find out which vertex indices are valid. */
+    repeated int32 VertexRefCounts = 5;
+
+    /** List of per-vertex edge one-rings */
+    repeated int32 VertexEdgeList = 6;
+
+}
+
+
+message Triangle {
+
+    /** List of triangle vertex-index triplets [Vert0 Vert1 Vert2]*/
+    message VertexIndexes {
+        required int32 Vert0 = 1;
+        required int32 Vert1 = 2;
+        required int32 Vert2 = 3;
+    }
+
+    /** List of triangle edge triplets [Edge0 Edge1 Edge2] */
+    message EdgeIndexes {
+        required int32 Edge0 = 1;
+        required int32 Edge1 = 2;
+        required int32 Edge2 = 3;
+    }
+
+    optional VertexIndexes vertexindexes = 1;
+    optional EdgeIndexes edgeindexes = 2;
+
+    /** Reference counts of triangle indices. Ref count is always 1 if the triangle exists. Iterate over this to find out which triangle indices are valid. */
+    repeated int32 TriangleRefCounts = 3;
+
+    /** (optional) List of per-triangle group identifiers */
+    repeated int32 TriangleGroups = 4;
+
+    /** Upper bound on the triangle group IDs used in the mesh (may be larger than the actual maximum if triangles have been deleted) */
+    optional int32 GroupIDCounter = 5;
+
+}
+
+message Edge {
+
+    /** List of edge elements. An edge is four elements [VertA, VertB, Tri0, Tri1], where VertA < VertB, and Tri1 may be InvalidID (if the edge is a boundary edge) */
+    message Elements {
+        required int32 VertA = 1;
+        required int32 VertB = 2;
+        required int32 Tri0 = 3;
+        required int32 Tri1 = 4;
+    }
+
+    optional Elements elements = 1;
+
+    /** Reference counts of edge indices. Ref count is always 1 if the edge exists. Iterate over this to find out which edge indices are valid. */
+    repeated int32 EdgeRefCounts = 2;
 
 }
 
 message Mesh {
     repeated Vertex vertices = 1;
+    repeated Triangle triangles = 2;
+    repeated Edge edges = 3;
 }

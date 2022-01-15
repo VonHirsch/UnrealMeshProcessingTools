@@ -10,6 +10,30 @@
 #include "ProtoBuf/addressbook.pb.h"
 #include "ProtoBuf/DynamicMesh3_ProtoBuf.pb.h"
 
+/*
+ *	Vertex
+ *		Position[double 3]		Vertices{}
+ *		Reference Count			VertexRefCounts{}		Reference counts of vertex indices
+ *		Normal[float 3]			VertexNormals{}
+ *		Color[float 3]			VertexColors{}
+ *		UV[float 2]				VertexUVs{}
+ *		VertexEdgeLists[]		VertexEdgeLists
+ *			each VertexEdgeList is an unordered list of connected edge indexes
+ *
+ *	Triangle[vertex indexes / int 3]
+ *		[v1,v2,v3]				Triangles
+ *		Reference Count			TriangleRefCounts{}		Reference counts of triangle indices
+ *
+ *	TriangleEdge[edge indexes / int 3]
+ *		e1=edge(v1,v2), e2=edge(v2,v3), e3=edge(v3,v1) (where the vertices are the vertex indexes of the triangle)*
+ *		[e1,e2,e3]				TriangleEdges
+ *		TriangleGroups (optional)
+ *
+ *	Edge[element indexes int 4]
+ *		[VertA, VertB, Tri0, Tri1]	Edges
+ *
+ */
+
 UGMKWorldGeometrySubsystem::UGMKWorldGeometrySubsystem()
 {
 	// Default chunk actor
