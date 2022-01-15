@@ -38,12 +38,9 @@ public:
 	void InitializeWorldContext(UWorld* World);
 	TSharedPtr<FDynamicMesh3> CreateTestBoxMesh();
 	void MeshTest();
-	void AddPosition(GMKProtoBuf::Mesh& ProtoMesh, const FVector3d& Position);
-	void AddVertex(GMKProtoBuf::Vertex* Vertex, FVector3d* Vector3s);
 	void SerializeMeshTest(const FDynamicMesh3* Mesh);
 	void DeSerializeMeshTest();
-	void AddMesh(const FDynamicMesh3* Mesh);
-	void AddPerson();
+	void AddVertex(GMKProtoBuf::Vertex* Vertex, FVector3d* Vector3s);
 
 	UPROPERTY()
 	UWorld* TargetWorld;
