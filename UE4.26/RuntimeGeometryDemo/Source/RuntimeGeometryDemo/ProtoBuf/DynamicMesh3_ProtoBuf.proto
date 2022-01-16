@@ -10,27 +10,27 @@ message Vertex {
         required double z = 3;
     }
 
-    message VertexNormals {
+    message Normal {
         required float x = 1;
         required float y = 2;
         required float z = 3;
     }
 
-    message VertexColors {
+    message Color {
         required float r = 1;
         required float g = 2;
         required float b = 3;
     }
 
-    message UVs {
+    message UV {
         required float u = 1;
         required float v = 2;
     }
 
     optional Position position = 1;
-    optional VertexNormals normals = 2;
-    optional VertexColors colors = 3;
-    optional UVs uvs = 4;
+    optional Normal normals = 2;
+    optional Color colors = 3;
+    optional UV uvs = 4;
 
     /** Reference counts of vertex indices. For vertices that exist, the count is 1 + num_triangle_using_vertex. Iterate over this to find out which vertex indices are valid. */
     repeated int32 VertexRefCounts = 5;

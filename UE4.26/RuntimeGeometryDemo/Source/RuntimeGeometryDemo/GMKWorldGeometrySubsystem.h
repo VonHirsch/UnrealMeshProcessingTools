@@ -37,16 +37,16 @@ public:
 
 	void InitializeWorldContext(UWorld* World);
 	TSharedPtr<FDynamicMesh3> CreateTestBoxMesh();
+	void BoxMeshTest();
 	void MeshTest();
-	void SerializeMeshTest(const FDynamicMesh3* Mesh);
-	void DeSerializeMeshTest();
-	void AddVertex(GMKProtoBuf::Vertex* Vertex, FVector3d* Vector3s);
+	void SerializeMeshTest(const FDynamicMesh3* Mesh, FString FileName);
+	void DeSerializeMeshTest(FString FileName);
 
 	UPROPERTY()
 	UWorld* TargetWorld;
 
 	UPROPERTY()
-	ADynamicPMCActor* PDIRenderActor;
+	ADynamicPMCActor* ChunkActor;
 
 	// UPROPERTY(EditAnywhere, Category = PlayerConfig, meta = (AllowPrivateAccess = "true"))
 	// TSubclassOf<class AActor> ProjectileBPType;

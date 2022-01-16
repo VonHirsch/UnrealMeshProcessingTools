@@ -6,6 +6,7 @@
 #include "RuntimeGeometryDemo.h"
 #include <fstream>
 
+#include "MeshNormals.h"
 #include "Generators/GridBoxMeshGenerator.h"
 #include "ProtoBuf/addressbook.pb.h"
 #include "ProtoBuf/DynamicMesh3_ProtoBuf.pb.h"
@@ -64,7 +65,7 @@ void UGMKWorldGeometrySubsystem::InitializeWorldContext(UWorld* World)
 		SpawnInfo.bNoFail = true;
 		SpawnInfo.ObjectFlags = RF_Transient;
 		FTransform MyTransform = FTransform(FVector(-290.f, 380.f, 180.f));
-		ADynamicPMCActor* ChunkActor = (GetWorld()->SpawnActor<ADynamicPMCActor>(WorldSystemDataAssets->ChunkActor.Get(), FVector(-290.f, 380.f, 180.f), FRotator(0,0,0), SpawnInfo));
+		ChunkActor = (GetWorld()->SpawnActor<ADynamicPMCActor>(WorldSystemDataAssets->ChunkActor.Get(), FVector(-290.f, 380.f, 180.f), FRotator(0,0,0), SpawnInfo));
 		ChunkActor->SetActorLabel("GMKChunkActor");
 		ChunkActor->CollisionMode = EDynamicMeshActorCollisionMode::ComplexAsSimpleAsync;
 
@@ -127,45 +128,139 @@ TSharedPtr<FDynamicMesh3> UGMKWorldGeometrySubsystem::CreateTestBoxMesh()
 	return Mesh;
 }
 
+void UGMKWorldGeometrySubsystem::BoxMeshTest()
+{
+	SYSLOG("GMK BoxMeshTest");
+
+	// Box Mesh Test
+	const TSharedPtr<FDynamicMesh3> InputMesh = CreateTestBoxMesh();
+
+	const FString FileName = TEXT("BoxMeshTest.buf");
+
+	// Serialize
+	SerializeMeshTest(InputMesh.Get(), FileName);
+
+	// DeSerialize
+	DeSerializeMeshTest(FileName);
+
+	// Todo: Create mesh from DeSerialized Data and Check it's Validity
+	//bool meshValid = InputMesh->CheckValidity();
+	//const FString LogMessage = (FString::Printf(TEXT("GMK MeshTest Result [%d]"), meshValid));
+	//SYSLOG(LogMessage);
+}
+
 void UGMKWorldGeometrySubsystem::MeshTest()
 {
 	SYSLOG("GMK MeshTest");
 
-	// ---- Setup
-	// Create a box mesh, random noise, and a directional filter pointing in the +Y direction
-	TSharedPtr<FDynamicMesh3> InputMesh = CreateTestBoxMesh();
-	bool meshValid = InputMesh->CheckValidity();
+	const FString FileName = TEXT("MeshTest.buf");
 
-	SerializeMeshTest(InputMesh.Get());
-	DeSerializeMeshTest();
+	FDynamicMesh3 InputMesh;
+	ChunkActor->GetMeshCopy(InputMesh);
 
-	const FString LogMessage = (FString::Printf(TEXT("GMK MeshTest Result [%d]"), meshValid));
-	SYSLOG(LogMessage);
+	// Serialize
+	SerializeMeshTest(&InputMesh, FileName);
+
+	// DeSerialize
+	DeSerializeMeshTest(FileName);
+
+	// Todo: Create mesh from DeSerialized Data and Check it's Validity
+	//bool meshValid = InputMesh->CheckValidity();
+	//const FString LogMessage = (FString::Printf(TEXT("GMK MeshTest Result [%d]"), meshValid));
+	//SYSLOG(LogMessage);
 
 }
 
-void UGMKWorldGeometrySubsystem::SerializeMeshTest(const FDynamicMesh3* Mesh)
+// Some Code Borrowed from FDynamicMesh3::CompactCopy, FDynamicMesh3::IsSameMesh, RTGUtils::UpdatePMCFromDynamicMesh_SplitTriangles
+void UGMKWorldGeometrySubsystem::SerializeMeshTest(const FDynamicMesh3* Mesh, FString FileName)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 	GMKProtoBuf::Mesh ProtoMesh;
 
-	// for each triangle index
+	//---------------------------------------------------------------------------------------
+	// Vertices
+	//---------------------------------------------------------------------------------------
+	FVertexInfo vinfo;
+	for (int vid = 0; vid < Mesh->MaxVertexID(); vid++)
+	{
+		if (Mesh->GetVertex(vid, vinfo, true, true, true))
+		{
+			GMKProtoBuf::Vertex* ProtoVertex = ProtoMesh.add_vertices();
+
+			// Position
+			GMKProtoBuf::Vertex_Position* ProtoPosition = ProtoVertex->mutable_position();
+			ProtoPosition->set_x(vinfo.Position.X);
+			ProtoPosition->set_y(vinfo.Position.Y);
+			ProtoPosition->set_z(vinfo.Position.Z);
+
+			// Normals
+			if (vinfo.bHaveN)
+			{
+				GMKProtoBuf::Vertex_Normal* ProtoNormal = ProtoVertex->mutable_normals();
+				ProtoNormal->set_x(vinfo.Normal.X);
+				ProtoNormal->set_y(vinfo.Normal.Y);
+				ProtoNormal->set_z(vinfo.Normal.Z);
+			}
+			// Colors
+			if (vinfo.bHaveC)
+			{
+				GMKProtoBuf::Vertex_Color* ProtoColor = ProtoVertex->mutable_colors();
+				ProtoColor->set_r(vinfo.Color.X);
+				ProtoColor->set_b(vinfo.Color.Y);
+				ProtoColor->set_g(vinfo.Color.Z);
+			}
+			// UVs
+			if (vinfo.bHaveUV)
+			{
+				GMKProtoBuf::Vertex_UV* ProtoUV = ProtoVertex->mutable_uvs();
+				ProtoUV->set_u(vinfo.UV.X);
+				ProtoUV->set_v(vinfo.UV.Y);
+			}
+
+		}
+
+	}
+
+	//---------------------------------------------------------------------------------------
+	// Triangles
+	//---------------------------------------------------------------------------------------
 	for (int32 tid : Mesh->TriangleIndicesItr())
 	{
-		FVector3d Position[3];
-		// get vertices
-		Mesh->GetTriVertices(tid, Position[0], Position[1], Position[2]);
+		GMKProtoBuf::Triangle* ProtoTriangle = ProtoMesh.add_triangles();
 
-		for (int j = 0; j < 3; ++j)
-		{
-			AddVertex(ProtoMesh.add_vertices(), &Position[j]);
-		}
+		// Vertex Indexes
+		FIndex3i TriVerts = Mesh->GetTriangle(tid);
+		GMKProtoBuf::Triangle_VertexIndexes* ProtoVertexIndex = ProtoTriangle->mutable_vertexindexes();
+		ProtoVertexIndex->set_vert0(TriVerts.A);
+		ProtoVertexIndex->set_vert1(TriVerts.B);
+		ProtoVertexIndex->set_vert2(TriVerts.C);
+
+		// Edge Indexes
+		FIndex3i TriEdges = Mesh->GetTriEdges(tid);
+		GMKProtoBuf::Triangle_EdgeIndexes* ProtoEdgeIndex = ProtoTriangle->mutable_edgeindexes();
+		ProtoEdgeIndex->set_edge0(TriEdges.A);
+		ProtoEdgeIndex->set_edge1(TriEdges.B);
+		ProtoEdgeIndex->set_edge2(TriEdges.C);
+	}
+
+	//---------------------------------------------------------------------------------------
+	// Edges
+	//---------------------------------------------------------------------------------------
+	for (int eid : Mesh->EdgeIndicesItr())
+	{
+		GMKProtoBuf::Edge* ProtoEdge = ProtoMesh.add_edges();
+		FDynamicMesh3::FEdge edge = Mesh->GetEdge(eid);
+		GMKProtoBuf::Edge_Elements* ProtoEdgeElements = ProtoEdge->mutable_elements();
+		ProtoEdgeElements->set_tri0(edge.Tri[0]);
+		ProtoEdgeElements->set_tri1(edge.Tri[1]);
+		ProtoEdgeElements->set_verta(edge.Vert[0]);
+		ProtoEdgeElements->set_vertb(edge.Vert[1]);
 	}
 
 	const FString LogMessage = (FString::Printf(TEXT("writing [%d] vertices"), ProtoMesh.vertices_size()));
 	SYSLOG(LogMessage);
 
-	const FString OutputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), TEXT("ProtoMesh.buf"));
+	const FString OutputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), FileName);
 	std::fstream output(ToCStr(OutputFileName), std::ios::out | std::ios::trunc | std::ios::binary);
 
 	if (!ProtoMesh.SerializeToOstream(&output)) {
@@ -177,13 +272,13 @@ void UGMKWorldGeometrySubsystem::SerializeMeshTest(const FDynamicMesh3* Mesh)
 
 }
 
-void UGMKWorldGeometrySubsystem::DeSerializeMeshTest()
+void UGMKWorldGeometrySubsystem::DeSerializeMeshTest(FString FileName)
 {
 
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 	GMKProtoBuf::Mesh ProtoMesh;
 
-	const FString InputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), TEXT("ProtoMesh.buf"));
+	const FString InputFileName = FPaths::Combine(FPaths::ProjectDir(), TEXT("buf"), FileName);
 	std::fstream input(ToCStr(InputFileName), std::ios::in | std::ios::binary);
 
 	if (!ProtoMesh.ParseFromIstream(&input)) {
@@ -206,12 +301,4 @@ void UGMKWorldGeometrySubsystem::DeSerializeMeshTest()
 
 	}
 
-}
-
-void UGMKWorldGeometrySubsystem::AddVertex(GMKProtoBuf::Vertex* ProtoVertex, FVector3d* Position)
-{
-	GMKProtoBuf::Vertex_Position* ProtoPosition = ProtoVertex->mutable_position();
-	ProtoPosition->set_x(Position->X);
-	ProtoPosition->set_y(Position->Y);
-	ProtoPosition->set_z(Position->Z);
 }
