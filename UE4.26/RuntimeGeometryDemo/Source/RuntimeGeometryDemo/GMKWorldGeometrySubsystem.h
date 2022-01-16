@@ -39,6 +39,8 @@ public:
 	TSharedPtr<FDynamicMesh3> CreateTestBoxMesh();
 	void BoxMeshTest();
 	void MeshTest();
+	bool IsSameMesh(const FDynamicMesh3& InputMesh, const FDynamicMesh3& OutputMesh, bool bCheckConnectivity, bool bCheckEdgeIDs,
+	                bool bCheckNormals, bool bCheckColors, bool bCheckUVs, bool bCheckGroups, float Epsilon);
 	void UpdatePMCMesh(ADynamicPMCActor* target, FDynamicMesh3 SourceMesh);
 	void SerializeMeshTest(const FDynamicMesh3* Mesh, FString FileName);
 	FDynamicMesh3 DeSerializeMeshTest(FString FileName);

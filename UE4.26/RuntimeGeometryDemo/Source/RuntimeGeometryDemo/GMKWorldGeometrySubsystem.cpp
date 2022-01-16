@@ -187,13 +187,156 @@ void UGMKWorldGeometrySubsystem::MeshTest()
 		SYSLOG(TEXT("GMK Mesh was invalid"));
 	}
 
+	// TODO, Check IsSameMesh to see where the two differ
+	bool IsSame = IsSameMesh(InputMesh, OutputMesh, true, true, true, true, true, true, 1.0f);
+
+	if (IsSame)
+	{
+		SYSLOG(TEXT("GMK Meshes are similar"));
+	} else {
+		SYSLOG(TEXT("GMK Meshes are dissimilar"));
+	}
+
+}
+
+bool UGMKWorldGeometrySubsystem::IsSameMesh(const FDynamicMesh3& InputMesh, const FDynamicMesh3& OutputMesh, bool bCheckConnectivity, bool bCheckEdgeIDs,
+	bool bCheckNormals, bool bCheckColors, bool bCheckUVs, bool bCheckGroups,
+	float Epsilon)
+{
+	if (InputMesh.VertexCount() != OutputMesh.VertexCount())
+	{
+		return false;
+	}
+	if (InputMesh.TriangleCount() != OutputMesh.TriangleCount())
+	{
+		return false;
+	}
+	for (int vid : InputMesh.VertexIndicesItr())
+	{
+		if (OutputMesh.IsVertex(vid) == false || VectorUtil::EpsilonEqual(InputMesh.GetVertex(vid), OutputMesh.GetVertex(vid), (double)Epsilon) == false)
+		{
+			return false;
+		}
+	}
+	for (int tid : InputMesh.TriangleIndicesItr())
+	{
+		if (OutputMesh.IsTriangle(tid) == false || (InputMesh.GetTriangle(tid) != OutputMesh.GetTriangle(tid)))
+		{
+			return false;
+		}
+	}
+	if (bCheckConnectivity)
+	{
+		for (int eid : InputMesh.EdgeIndicesItr())
+		{
+			FDynamicMesh3::FEdge e = InputMesh.GetEdge(eid);
+			int other_eid = OutputMesh.FindEdge(e.Vert[0], e.Vert[1]);
+			if (other_eid == FDynamicMesh3::InvalidID)
+			{
+				return false;
+			}
+			FDynamicMesh3::FEdge oe = OutputMesh.GetEdge(other_eid);
+			if (FMath::Min(e.Tri[0], e.Tri[1]) != FMath::Min(oe.Tri[0], oe.Tri[1]) ||
+			    FMath::Max(e.Tri[0], e.Tri[1]) != FMath::Max(oe.Tri[0], oe.Tri[1]))
+			{
+				return false;
+			}
+		}
+	}
+	if (bCheckEdgeIDs)
+	{
+		if (InputMesh.EdgeCount() != OutputMesh.EdgeCount())
+		{
+			return false;
+		}
+		for (int eid : InputMesh.EdgeIndicesItr())
+		{
+			if (OutputMesh.IsEdge(eid) == false || InputMesh.GetEdge(eid) != OutputMesh.GetEdge(eid))
+			{
+				return false;
+			}
+		}
+	}
+	if (bCheckNormals)
+	{
+		if (InputMesh.HasVertexNormals() != OutputMesh.HasVertexNormals())
+		{
+			return false;
+		}
+		if (InputMesh.HasVertexNormals())
+		{
+			for (int vid : InputMesh.VertexIndicesItr())
+			{
+				if (VectorUtil::EpsilonEqual(InputMesh.GetVertexNormal(vid), OutputMesh.GetVertexNormal(vid), Epsilon) == false)
+				{
+					return false;
+				}
+			}
+		}
+	}
+	if (bCheckColors)
+	{
+		if (InputMesh.HasVertexColors() != OutputMesh.HasVertexColors())
+		{
+			return false;
+		}
+		if (InputMesh.HasVertexColors())
+		{
+			for (int vid : InputMesh.VertexIndicesItr())
+			{
+				if (VectorUtil::EpsilonEqual(InputMesh.GetVertexColor(vid), OutputMesh.GetVertexColor(vid), Epsilon) == false)
+				{
+					return false;
+				}
+			}
+		}
+	}
+	if (bCheckUVs)
+	{
+		if (InputMesh.HasVertexUVs() != OutputMesh.HasVertexUVs())
+		{
+			return false;
+		}
+		if (InputMesh.HasVertexUVs())
+		{
+			for (int vid : InputMesh.VertexIndicesItr())
+			{
+				if (VectorUtil::EpsilonEqual(InputMesh.GetVertexUV(vid), OutputMesh.GetVertexUV(vid), Epsilon) == false)
+				{
+					return false;
+				}
+			}
+		}
+	}
+	if (bCheckGroups)
+	{
+		if (InputMesh.HasTriangleGroups() != OutputMesh.HasTriangleGroups())
+		{
+			return false;
+		}
+		if (InputMesh.HasTriangleGroups())
+		{
+			for (int tid : InputMesh.TriangleIndicesItr())
+			{
+				int M1TriangleGroupID = InputMesh.GetTriangleGroup(tid);	// 1
+				int M2TriangleGroupID = OutputMesh.GetTriangleGroup(tid);   // 0 == TriangleRefCounts.IsValid(tID) false
+
+				if (M1TriangleGroupID != M2TriangleGroupID)
+				{
+					return false;	// Returns Here
+				}
+			}
+		}
+	}
+	return true;
 }
 
 void UGMKWorldGeometrySubsystem::UpdatePMCMesh(ADynamicPMCActor* target, FDynamicMesh3 SourceMesh)
 {
 	if (target->MeshComponent)
 	{
-		bool bUseFaceNormals = (target->NormalsMode == EDynamicMeshActorNormalsMode::FaceNormals);
+		// Setting bUseFaceNormals true fixed the bad texture problem.  Looks much better now
+		bool bUseFaceNormals = true; // (target->NormalsMode == EDynamicMeshActorNormalsMode::FaceNormals);
 		bool bUseUV0 = true;
 		bool bUseVertexColors = false;
 
