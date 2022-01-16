@@ -39,14 +39,18 @@ public:
 	TSharedPtr<FDynamicMesh3> CreateTestBoxMesh();
 	void BoxMeshTest();
 	void MeshTest();
+	void UpdatePMCMesh(ADynamicPMCActor* target, FDynamicMesh3 SourceMesh);
 	void SerializeMeshTest(const FDynamicMesh3* Mesh, FString FileName);
-	void DeSerializeMeshTest(FString FileName);
+	FDynamicMesh3 DeSerializeMeshTest(FString FileName);
 
 	UPROPERTY()
 	UWorld* TargetWorld;
 
 	UPROPERTY()
-	ADynamicPMCActor* ChunkActor;
+	ADynamicPMCActor* ChunkActorSerialize;
+
+	UPROPERTY()
+	ADynamicPMCActor* ChunkActorDeSerialize;
 
 	// UPROPERTY(EditAnywhere, Category = PlayerConfig, meta = (AllowPrivateAccess = "true"))
 	// TSubclassOf<class AActor> ProjectileBPType;
